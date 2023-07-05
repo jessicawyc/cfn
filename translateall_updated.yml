@@ -1,0 +1,323 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: translate-all
+Transform:
+- AWS::Serverless-2016-10-31
+Parameters:
+  NumberOfIteration:
+    Type: Number
+    Default: 60
+  ConcurrentTranslateJob:
+    Type: Number
+    Default: 5
+Globals:
+  Function:
+    Runtime: nodejs18.x
+    Timeout: 300
+    Handler: app.lambdaHandler
+    Tracing: Active
+    Environment:
+      Variables:
+        InputBucket:
+          Ref: InputBucket
+        OutputBucket:
+          Ref: OutputBucket
+Resources:
+  TranlateQueue:
+    Type: AWS::SQS::Queue
+  StartTranslateStateMachine:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: A Lambda function that logs the payload of messages sent to an associated SQS queue.
+      Runtime: nodejs18.x
+      CodeUri:
+        Bucket: awsserverlessrepo-changesets-plntc6bfnfj
+        Key: 295158943844/arn:aws:serverlessrepo:us-east-1:111964674713:applications-Translate-All-versions-1.0.0/4564ddc9-bf16-46d0-907c-27645b43900b
+      Events:
+        SQSQueueEvent:
+          Type: SQS
+          Properties:
+            Queue:
+              Fn::GetAtt:
+              - TranlateQueue
+              - Arn
+      MemorySize: 128
+      Timeout: 25
+      Policies:
+      - AWSLambdaBasicExecutionRole
+      - StepFunctionsExecutionPolicy:
+          StateMachineName:
+            Fn::GetAtt:
+            - TranslateStateMachine
+            - Name
+      Environment:
+        Variables:
+          TranslateStateMachine:
+            Ref: TranslateStateMachine
+  Iterator:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri:
+        Bucket: awsserverlessrepo-changesets-plntc6bfnfj
+        Key: 295158943844/arn:aws:serverlessrepo:us-east-1:111964674713:applications-Translate-All-versions-1.0.0/df42d7c6-e710-47f6-a771-eeb65d8e570d
+      Policies:
+      - AWSLambdaBasicExecutionRole
+  StartTranslateJob:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri:
+        Bucket: awsserverlessrepo-changesets-plntc6bfnfj
+        Key: 295158943844/arn:aws:serverlessrepo:us-east-1:111964674713:applications-Translate-All-versions-1.0.0/b94435ee-1141-4222-9f28-d3bdf4c09366
+      Policies:
+      - AWSLambdaBasicExecutionRole
+      - arn:aws:iam::aws:policy/TranslateFullAccess
+      - S3WritePolicy:
+          BucketName:
+            Ref: OutputBucket
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - iam:PassRole
+          Resource:
+            Fn::GetAtt:
+            - DataAccessRole
+            - Arn
+      Environment:
+        Variables:
+          DataAccessRoleArn:
+            Fn::GetAtt:
+            - DataAccessRole
+            - Arn
+  GetTextTranslationJob:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri:
+        Bucket: awsserverlessrepo-changesets-plntc6bfnfj
+        Key: 295158943844/arn:aws:serverlessrepo:us-east-1:111964674713:applications-Translate-All-versions-1.0.0/50bd923b-18f2-4af1-a731-9b11f9b44db0
+      Policies:
+      - AWSLambdaBasicExecutionRole
+      - arn:aws:iam::aws:policy/TranslateFullAccess
+  CopyToTypeFolder:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri:
+        Bucket: awsserverlessrepo-changesets-plntc6bfnfj
+        Key: 295158943844/arn:aws:serverlessrepo:us-east-1:111964674713:applications-Translate-All-versions-1.0.0/b028ea23-2a0e-4817-8145-7865de5a52a4
+      Policies:
+      - AWSLambdaBasicExecutionRole
+      - S3CrudPolicy:
+          BucketName:
+            Ref: InputBucket
+      - Statement:
+        - Effect: Allow
+          Action:
+          - s3:GetObjectTagging
+          - s3:PutObjectTagging
+          Resource:
+          - Fn::Sub: arn:aws:s3:::${InputBucket}/*
+  CopyToParentFolder:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri:
+        Bucket: awsserverlessrepo-changesets-plntc6bfnfj
+        Key: 295158943844/arn:aws:serverlessrepo:us-east-1:111964674713:applications-Translate-All-versions-1.0.0/23408e52-2243-4a64-be31-9f6a0eca7fb3
+      Policies:
+      - AWSLambdaBasicExecutionRole
+      - S3CrudPolicy:
+          BucketName:
+            Ref: OutputBucket
+      - Statement:
+        - Effect: Allow
+          Action:
+          - s3:GetObjectTagging
+          - s3:PutObjectTagging
+          Resource:
+          - Fn::Sub: arn:aws:s3:::${OutputBucket}/*
+  DataAccessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - translate.amazonaws.com
+          Action: sts:AssumeRole
+      Path: /
+      Policies:
+      - PolicyName: root
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            Resource:
+            - Fn::Sub: arn:aws:s3:::${InputBucket}/*
+            - Fn::Sub: arn:aws:s3:::${OutputBucket}/*
+          - Effect: Allow
+            Action:
+            - s3:ListBucket
+            Resource:
+            - Fn::GetAtt:
+              - InputBucket
+              - Arn
+            - Fn::GetAtt:
+              - OutputBucket
+              - Arn
+          - Effect: Allow
+            Action:
+            - s3:PutObject
+            Resource:
+            - Fn::Sub: arn:aws:s3:::${OutputBucket}/*
+  TranslateStatesExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - Fn::Sub: states.${AWS::Region}.amazonaws.com
+          Action: sts:AssumeRole
+      Path: /
+      Policies:
+      - PolicyName: StatesExecutionPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - SNS:Publish
+            Resource:
+            - Ref: TranslateCompletionSNSTopic
+          - Effect: Allow
+            Action:
+            - lambda:InvokeFunction
+            Resource:
+            - Fn::GetAtt:
+              - StartTranslateJob
+              - Arn
+            - Fn::GetAtt:
+              - GetTextTranslationJob
+              - Arn
+            - Fn::GetAtt:
+              - Iterator
+              - Arn
+            - Fn::GetAtt:
+              - CopyToTypeFolder
+              - Arn
+            - Fn::GetAtt:
+              - CopyToParentFolder
+              - Arn
+  TranslateCompletionSNSTopic:
+    Type: AWS::SNS::Topic
+  TranslateStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      DefinitionString:
+        Fn::Sub:
+        - "{\n  \"Comment\": \"Translate all documents State Machine\",\n  \"StartAt\"\
+          : \"Copy to Type Folder\",\n  \"States\": {\n    \"Copy to Type Folder\"\
+          : {\n        \"Type\": \"Task\",\n        \"Resource\": \"${CopyToTypeFolder}\"\
+          ,\n        \"Next\": \"Translate All\"\n    }, \n    \"Translate All\":\
+          \ {\n      \"Type\": \"Map\",\n      \"MaxConcurrency\": ${ConcurrentTranslateJob},\n\
+          \      \"InputPath\": \"$\",\n      \"ItemsPath\": \"$.contentTypes\",\n\
+          \      \"Parameters\": {\n        \"Id.$\":  \"$.JobName\",\n        \"\
+          JobName.$\":  \"$.JobName\",\n        \"InputBucket.$\":  \"$.InputBucket\"\
+          ,\n        \"InputS3Uri.$\":  \"$.InputS3Uri\",\n        \"OutputBucket.$\"\
+          :  \"$.OutputBucket\",\n        \"SourceLanguageCode.$\":  \"$.SourceLanguageCode\"\
+          ,\n        \"TargetLanguageCodes.$\": \"$.TargetLanguageCodes\",\n     \
+          \   \"ContentType.$\": \"$$.Map.Item.Value\"\n      },\n      \"MaxConcurrency\"\
+          : 0,\n      \"Next\": \"Copy to Parent Folder\",                  \n   \
+          \   \"Iterator\": {\n        \"StartAt\": \"Start Translate Job\",\n   \
+          \     \"States\": {\n          \"Start Translate Job\": {\n            \"\
+          Type\": \"Task\",\n            \"Resource\": \"${StartTranslateJob}\",\n\
+          \            \"Next\": \"Configure Count\",\n            \"Retry\": [ {\n\
+          \                \"ErrorEquals\": [ \"LimitExceededException\", \"ProvisionedThroughputExceededException\"\
+          ],\n                \"IntervalSeconds\": 10,\n                \"BackoffRate\"\
+          : 2.0,\n                \"MaxAttempts\": 3\n            }]\n          },\n\
+          \          \"Configure Count\": {\n            \"Type\": \"Pass\",\n   \
+          \         \"InputPath\": \"$\",\n            \"Result\": {\n           \
+          \     \"count\": ${NumberOfIteration},\n                \"index\": 0,\n\
+          \                \"step\": 1\n            },\n            \"ResultPath\"\
+          : \"$.iterator\",\n            \"Next\": \"Iterator\"\n          },\n  \
+          \        \"Iterator\": {\n              \"Type\": \"Task\",\n          \
+          \    \"Resource\": \"${Iterator}\",\n              \"ResultPath\": \"$.iterator\"\
+          ,\n              \"Next\": \"Is Count Reached Or Succeeded\"\n         \
+          \ },\n          \"Is Count Reached Or Succeeded\": {\n              \"Type\"\
+          : \"Choice\",\n              \"Choices\": [\n                  {\n     \
+          \                 \"Variable\": \"$.iterator.continue\",\n             \
+          \         \"BooleanEquals\": true,\n                      \"Next\": \"Get\
+          \ Translate Job\"\n                  }\n              ],\n             \
+          \ \"Default\": \"Finish one type Translate Job\"\n          },\n       \
+          \   \"Get Translate Job\": {\n              \"Type\": \"Task\",\n      \
+          \        \"Resource\": \"${GetTextTranslationJob}\",\n              \"Next\"\
+          : \"Wait 3 minute\"\n          },\n          \"Wait 3 minute\": {\n    \
+          \        \"Type\": \"Wait\",\n            \"Seconds\": 180,\n          \
+          \  \"Next\": \"Iterator\"\n          },\n          \"Finish one type Translate\
+          \ Job\": {\n            \"Type\": \"Pass\",\n            \"OutputPath\"\
+          : \"$\", \n            \"End\": true\n          }\n        }\n      },\n\
+          \      \"ResultPath\": \"$\"\n    },\n    \"Copy to Parent Folder\": {\n\
+          \        \"Type\": \"Task\",\n        \"Resource\": \"${CopyToParentFolder}\"\
+          ,\n        \"Next\": \"Finish All Translate Job\"\n    }, \n    \"Finish\
+          \ All Translate Job\": {\n      \"Type\": \"Pass\",\n      \"OutputPath\"\
+          : \"$\", \n      \"Next\": \"Publish to SNS\"\n    }, \n    \"Publish to\
+          \ SNS\": {\n      \"Type\": \"Task\",\n      \"Resource\": \"arn:aws:states:::sns:publish\"\
+          ,\n      \"Parameters\": {\n       \"TopicArn\":\"${TranslateCompletionSNSTopic}\"\
+          ,\n       \"Message.$\": \"$\"\n      },\n      \"Next\": \"SuccessState\"\
+          \n     }, \n    \"SuccessState\": {\n      \"Type\": \"Succeed\"\n    }\n\
+          \  }\n}"
+        - Iterator:
+            Fn::GetAtt:
+            - Iterator
+            - Arn
+          StartTranslateJob:
+            Fn::GetAtt:
+            - StartTranslateJob
+            - Arn
+          GetTextTranslationJob:
+            Fn::GetAtt:
+            - GetTextTranslationJob
+            - Arn
+          CopyToTypeFolder:
+            Fn::GetAtt:
+            - CopyToTypeFolder
+            - Arn
+          CopyToParentFolder:
+            Fn::GetAtt:
+            - CopyToParentFolder
+            - Arn
+          TranslateCompletionSNSTopic:
+            Ref: TranslateCompletionSNSTopic
+          ConcurrentTranslateJob:
+            Ref: ConcurrentTranslateJob
+      RoleArn:
+        Fn::GetAtt:
+        - TranslateStatesExecutionRole
+        - Arn
+  InputBucket:
+    Type: AWS::S3::Bucket
+  OutputBucket:
+    Type: AWS::S3::Bucket
+Outputs:
+  TranlateQueueArn:
+    Description: Tranlate Job Queue
+    Value:
+      Fn::GetAtt:
+      - TranlateQueue
+      - Arn
+  TranslateCompletionSNSTopic:
+    Description: Documents Set Translate Completion SNS Topic
+    Value:
+      Ref: TranslateCompletionSNSTopic
+  InputBucket:
+    Description: Input Documents to be translated.
+    Value:
+      Ref: InputBucket
+  OutputBucket:
+    Description: translated output Documents.
+    Value:
+      Ref: OutputBucket
