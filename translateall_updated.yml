@@ -11,7 +11,7 @@ Parameters:
     Default: 5
 Globals:
   Function:
-    Runtime: nodejs18.x
+    Runtime: nodejs16.x
     Timeout: 300
     Handler: app.lambdaHandler
     Tracing: Active
@@ -28,7 +28,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Description: A Lambda function that logs the payload of messages sent to an associated SQS queue.
-      Runtime: nodejs18.x
+      Runtime: nodejs16.x
       CodeUri:
         Bucket: awsserverlessrepo-changesets-plntc6bfnfj
         Key: 295158943844/arn:aws:serverlessrepo:us-east-1:111964674713:applications-Translate-All-versions-1.0.0/4564ddc9-bf16-46d0-907c-27645b43900b
