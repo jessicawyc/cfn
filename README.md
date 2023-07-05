@@ -6,8 +6,7 @@ https://aws.amazon.com/blogs/machine-learning/translate-all-automating-multiple-
 The template is updated for nodejs version, use [here](translateall_updated.yml)
 
 Trigger Code sample
-
-´´´
+```
 {
   "JobName": "testing",
   "InputBucket": "translateall-inputbucket-1nmk3eanpwrki",
@@ -18,8 +17,7 @@ Trigger Code sample
     "en"
   ]
 }
-
-´´´
+```
 
 
 language code 在这里查
