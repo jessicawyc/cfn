@@ -18,7 +18,8 @@ Trigger Code sample
   ]
 }
 ```
-
+```
+```
 
 language code 在这里查
 https://docs.aws.amazon.com/translate/latest/dg/what-is-languages.html
